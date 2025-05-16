@@ -1,0 +1,2245 @@
+import React, { useState, useRef, useEffect } from 'react';
+import { Upload, Plus, X, Download, Share, Printer, Move, Trash2, Mail, Phone, MapPin, Link as LinkIcon, AlertCircle, CheckCircle, PenLine, FileDown, Layout, Info, Languages as LanguagesIcon, Award, Folder as FolderIcon, Heart } from 'lucide-react';
+import { DragDropContext, Draggable, Droppable } from 'react-beautiful-dnd';
+import { jsPDF } from 'jspdf';
+import html2canvas from 'html2canvas';
+import { motion, AnimatePresence } from 'framer-motion';
+import { useLocation, useNavigate } from 'react-router-dom';
+import TemplateSelector from './TemplateSelector';
+import AIWritingAssistant from './AIWritingAssistant';
+
+interface ResumeData {
+  name: string;
+  title: string;
+  email: string;
+  phone: string;
+  location: string;
+  summary: string;
+  employment: Array<{
+    company: string;
+    position: string;
+    startDate: string;
+    endDate: string;
+    description: string;
+  }>;
+  education: Array<{
+    institution: string;
+    degree: string;
+    graduationDate: string;
+  }>;
+  skills: string[];
+  links: Array<{
+    title: string;
+    url: string;
+  }>;
+  customSections: {
+    [key: string]: string[];
+  };
+}
+
+const ResumeCreator: React.FC = () => {
+  const [resumeData, setResumeData] = useState<ResumeData>({
+    name: '',
+    title: '',
+    email: '',
+    phone: '',
+    location: '',
+    summary: 'Curious science teacher with 8+ years of experience and a track record of...',
+    employment: [],
+    education: [],
+    skills: [
+      'Critical thinking and problem solving',
+      'Ability to Work in a Team',
+      'Initiative and Problem-solving Abilities',
+      'Analytical Thinking',
+      'Communication Skills',
+      'Project Management',
+      'Time Management Skills',
+      'Creative Problem Solving',
+      'Analytical Skills',
+      'Attention to Detail'
+    ],
+    links: [],
+    customSections: {}
+  });
+
+  const [profilePhoto, setProfilePhoto] = useState<string | null>(null);
+  const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
+  const resumeRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [activeSections, setActiveSections] = useState<string[]>([
+    'personal',
+    'summary',
+    'employment',
+    'education',
+    'skills',
+    'links'
+  ]);
+  const [additionalSections, setAdditionalSections] = useState<{[key: string]: any}>({
+    courses: [],
+    activities: [],
+    hobbies: [],
+    languages: [],
+    references: []
+  });
+
+  const [newCustomSectionName, setNewCustomSectionName] = useState<string>('');
+  const [showCustomSectionInput, setShowCustomSectionInput] = useState<boolean>(false);
+
+  const [newSkill, setNewSkill] = useState<string>('');
+
+  const [resumeScore, setResumeScore] = useState<number>(15); // Initial resume score
+  const [showTemplateModal, setShowTemplateModal] = useState<boolean>(false);
+  const [activeTemplate, setActiveTemplate] = useState<string>("default");
+  const [showAIWritingHelp, setShowAIWritingHelp] = useState<boolean>(false);
+
+  const location = useLocation();
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    const queryParams = new URLSearchParams(location.search);
+    const templateId = queryParams.get('template');
+    if (templateId) {
+      setActiveTemplate(templateId);
+    }
+  }, [location.search]);
+
+  const navigateBack = () => {
+    navigate('/dashboard/resumes');
+  };
+
+  const handleInputChange = (field: string, value: string) => {
+    // Support nested fields with dot notation (e.g., 'employment.0.company')
+    if (field.includes('.')) {
+      const [section, index, subField] = field.split('.');
+      const sectionData = [...resumeData[section]];
+      
+      if (sectionData[parseInt(index)]) {
+        sectionData[parseInt(index)] = {
+          ...sectionData[parseInt(index)],
+          [subField]: value
+        };
+        
+        setResumeData({
+          ...resumeData,
+          [section]: sectionData
+        });
+      }
+    } else {
+      setResumeData({
+        ...resumeData,
+        [field]: value
+      });
+    }
+  };
+
+  // Modify the handlePhotoUpload function to trigger the file input click
+  const handlePhotoUpload = () => {
+    // Trigger the hidden file input
+    if (fileInputRef.current) {
+      fileInputRef.current.click();
+    }
+  };
+
+  // Function to handle file input change
+  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setProfilePhoto(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const removePhoto = () => {
+    setProfilePhoto(null);
+  };
+
+  const downloadAsPDF = async () => {
+    if (!resumeRef.current) return;
+    
+    setIsGeneratingPDF(true);
+    
+    try {
+      await generatePuppeteerPDF(resumeRef.current, `${resumeData.name || 'my'}_resume.pdf`);
+    } catch (error) {
+      console.error('Error generating PDF:', error);
+      alert('Failed to generate PDF. Please try again.');
+    } finally {
+      setIsGeneratingPDF(false);
+    }
+  };
+
+  const addEmployment = () => {
+    setResumeData({
+      ...resumeData,
+      employment: [...resumeData.employment, { 
+        company: '', 
+        position: '', 
+        startDate: '', 
+        endDate: '', 
+        description: '' 
+      }]
+    });
+  };
+
+  const addEducation = () => {
+    setResumeData({
+      ...resumeData,
+      education: [...resumeData.education, { 
+        institution: '', 
+        degree: '', 
+        graduationDate: '' 
+      }]
+    });
+  };
+
+  const addLink = () => {
+    setResumeData({
+      ...resumeData,
+      links: [...resumeData.links, { title: '', url: '' }]
+    });
+  };
+
+  const addSkill = () => {
+    if (newSkill.trim() && !resumeData.skills.includes(newSkill.trim())) {
+      setResumeData(prev => ({
+        ...prev,
+        skills: [...prev.skills, newSkill.trim()]
+      }));
+      setNewSkill('');
+    }
+  };
+
+  const removeSkill = (index: number) => {
+    setResumeData(prev => ({
+      ...prev,
+      skills: prev.skills.filter((_, i) => i !== index)
+    }));
+  };
+
+  const removeEmployment = (index: number) => {
+    const updatedEmployment = [...resumeData.employment];
+    updatedEmployment.splice(index, 1);
+    setResumeData({...resumeData, employment: updatedEmployment});
+  };
+
+  const removeEducation = (index: number) => {
+    const updatedEducation = [...resumeData.education];
+    updatedEducation.splice(index, 1);
+    setResumeData({...resumeData, education: updatedEducation});
+  };
+
+  const removeLink = (index: number) => {
+    const updatedLinks = [...resumeData.links];
+    updatedLinks.splice(index, 1);
+    setResumeData({...resumeData, links: updatedLinks});
+  };
+
+  const saveProgress = () => {
+    alert('Resume progress saved!');
+  };
+
+  const shareResume = () => {
+    alert('Share options would open here');
+  };
+
+  const printResume = () => {
+    // Get the resume element
+    const resumeElement = resumeRef.current;
+    if (!resumeElement) return;
+    
+    // Open a new window for printing
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) {
+      alert('Please allow popups to print your resume.');
+      return;
+    }
+    
+    // Get the computed styles to preserve them in print
+    const computedStyle = window.getComputedStyle(resumeElement);
+    
+    // Clone the resume element
+    const clonedResume = resumeElement.cloneNode(true) as HTMLElement;
+    
+    // Remove the watermark if present
+    const watermark = clonedResume.querySelector('.absolute.bottom-2.right-4');
+    if (watermark) watermark.remove();
+    
+    // Create a clean document with only the resume content
+    printWindow.document.write(`
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>${resumeData.name || 'Resume'}</title>
+          <style>
+            /* Base styling for the page */
+            @page {
+              size: letter;
+              margin: 0;
+            }
+            
+            html, body {
+              margin: 0;
+              padding: 0;
+              width: 100%;
+              height: 100%;
+              background-color: white;
+              font-family: Arial, sans-serif;
+            }
+            
+            /* Container styling */
+            .resume-container {
+              width: 8.5in;
+              height: 11in;
+              margin: 0 auto;
+              background-color: white;
+              box-shadow: none;
+              overflow: hidden;
+              position: relative;
+            }
+            
+            /* Preserve resume template styling */
+            .resume-${activeTemplate} {
+              height: 100%;
+              width: 100%;
+            }
+            
+            /* Ensure text colors and backgrounds print correctly */
+            * {
+              -webkit-print-color-adjust: exact !important;
+              print-color-adjust: exact !important;
+              color-adjust: exact !important;
+            }
+            
+            /* Specific styling from the original template */
+            h1 { font-size: 24px; font-weight: bold; margin-bottom: 4px; }
+            h2 { font-size: 18px; font-weight: normal; color: #4B5563; margin-bottom: 8px; }
+            h3 { font-size: 16px; font-weight: 600; margin-bottom: 8px; }
+            
+            .mb-6 { margin-bottom: 1.5rem; }
+            .p-8 { padding: 2rem; }
+            
+            /* Print media query */
+            @media print {
+              .resume-container {
+                box-shadow: none;
+              }
+            }
+          </style>
+        </head>
+        <body>
+          <div class="resume-container">
+            ${clonedResume.outerHTML}
+          </div>
+          <script>
+            window.onload = function() {
+              // Wait for all resources to load
+              setTimeout(() => {
+                window.print();
+                window.close();
+              }, 800);
+            };
+          </script>
+        </body>
+      </html>
+    `);
+    
+    printWindow.document.close();
+    printWindow.focus();
+  };
+
+  const onDragEnd = (result: any) => {
+    const { destination, source } = result;
+    
+    console.log('Drag ended:', result);
+    
+    // If dropped outside the list or didn't move
+    if (!destination || 
+        (destination.droppableId === source.droppableId && 
+         destination.index === source.index)) {
+      return;
+    }
+    
+    const newSectionOrder = Array.from(activeSections);
+    const [removed] = newSectionOrder.splice(source.index, 1);
+    newSectionOrder.splice(destination.index, 0, removed);
+    
+    console.log('New section order:', newSectionOrder);
+    setActiveSections(newSectionOrder);
+  };
+
+  const addSection = (sectionType: string) => {
+    if (!activeSections.includes(sectionType)) {
+      setActiveSections([...activeSections, sectionType]);
+    }
+  };
+
+  const addCustomSection = () => {
+    if (!newCustomSectionName.trim()) return;
+    
+    const sectionKey = newCustomSectionName.toLowerCase().replace(/\s+/g, '_');
+    
+    // Check if this section already exists
+    if (activeSections.includes(sectionKey)) {
+      alert(`A section named "${newCustomSectionName}" already exists.`);
+      return;
+    }
+    
+    // Add the section to active sections
+    setActiveSections([...activeSections, sectionKey]);
+    
+    // Add empty array for this custom section in resumeData
+    setResumeData({
+      ...resumeData,
+      customSections: {
+        ...resumeData.customSections,
+        [sectionKey]: []
+      }
+    });
+    
+    // Reset input
+    setNewCustomSectionName('');
+    setShowCustomSectionInput(false);
+  };
+
+  // Function to add an item to a custom section
+  const addCustomSectionItem = (sectionKey: string) => {
+    const updatedCustomSections = {
+      ...resumeData.customSections,
+      [sectionKey]: [...(resumeData.customSections[sectionKey] || []), '']
+    };
+    
+    setResumeData({
+      ...resumeData,
+      customSections: updatedCustomSections
+    });
+  };
+
+  // Function to update a custom section item
+  const updateCustomSectionItem = (sectionKey: string, index: number, value: string) => {
+    const sectionItems = [...resumeData.customSections[sectionKey]];
+    sectionItems[index] = value;
+    
+    setResumeData({
+      ...resumeData,
+      customSections: {
+        ...resumeData.customSections,
+        [sectionKey]: sectionItems
+      }
+    });
+  };
+
+  // Function to remove a custom section item
+  const removeCustomSectionItem = (sectionKey: string, index: number) => {
+    const sectionItems = [...resumeData.customSections[sectionKey]];
+    sectionItems.splice(index, 1);
+    
+    setResumeData({
+      ...resumeData,
+      customSections: {
+        ...resumeData.customSections,
+        [sectionKey]: sectionItems
+      }
+    });
+  };
+
+  // Function that renders a specific section in the resume preview
+  const renderSection = (section: string) => {
+    // For standard sections
+    if (section === 'summary') {
+      return (
+        <div className="mb-6">
+          <div className="flex justify-between items-center mb-2">
+            <h3 className="text-lg font-semibold">Professional Summary</h3>
+            <button 
+              onClick={() => setShowAIWritingHelp(true)}
+              className="px-3 py-1 bg-blue-600 text-white text-xs rounded-full flex items-center hover:bg-blue-700 transition-colors"
+            >
+              <PenLine className="h-3 w-3 mr-1" />
+              AI-Assist
+            </button>
+          </div>
+          <textarea
+            className="w-full border border-gray-300 rounded-lg p-3 focus:outline-none focus:ring-2 focus:ring-[#4ECCA3] focus:border-transparent"
+            placeholder="Write 2-4 short, energetic sentences that grab an employer's attention and highlight your skills and work ethic..."
+            rows={5}
+            value={resumeData.summary}
+            onChange={(e) => handleInputChange('summary', e.target.value)}
+          />
+          <div className="flex justify-between text-xs text-gray-500 mt-1">
+            <p>400-600 characters recommended to increase interview chances</p>
+            <p>{resumeData.summary.length} characters</p>
+          </div>
+        </div>
+      );
+    }
+    
+    if (section === 'employment') {
+      return (
+        <div className="mb-6">
+          <h3 className="text-lg font-semibold mb-3">Employment History</h3>
+          {resumeData.employment.length > 0 ? (
+            <div className="space-y-4">
+              {resumeData.employment.map((job, idx) => (
+                <div key={idx} className="border-l-2 border-gray-200 pl-4 relative hover:border-[#4ECCA3] transition-colors">
+                  <div className="w-2 h-2 rounded-full bg-gray-300 absolute -left-[5px] top-1"></div>
+                  <div className="flex justify-between">
+                    <h4 className="font-medium">{job.position}</h4>
+                    <span className="text-sm text-gray-500">{job.startDate} - {job.endDate || 'Present'}</span>
+                  </div>
+                  <p className="text-sm text-gray-600">{job.company}</p>
+                  <ul className="list-disc pl-5 space-y-1">
+                    {job.description.split('\n').map((line, index) => (
+                      line.trim() ? <li key={index} className="text-gray-700">{line}</li> : null
+                    ))}
+                  </ul>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-gray-400 italic">No employment history added yet</p>
+          )}
+        </div>
+      );
+    }
+    
+    if (section === 'education') {
+      return (
+        <div className="mb-6">
+          <h3 className="text-lg font-semibold mb-3">Education</h3>
+          {resumeData.education.length > 0 ? (
+            <div className="space-y-4">
+              {resumeData.education.map((edu, idx) => (
+                <div key={idx} className="border-l-2 border-gray-200 pl-4 relative hover:border-[#4ECCA3] transition-colors">
+                  <div className="w-2 h-2 rounded-full bg-gray-300 absolute -left-[5px] top-1"></div>
+                  <div className="flex justify-between">
+                    <h4 className="font-medium">{edu.degree}</h4>
+                    <span className="text-sm text-gray-500">{edu.startDate} - {edu.endDate || 'Present'}</span>
+                  </div>
+                  <p className="text-sm text-gray-600">{edu.institution}</p>
+                  {edu.location && <p className="text-sm text-gray-600">{edu.location}</p>}
+                  {edu.gpa && <p className="text-sm text-gray-600">GPA: {edu.gpa}</p>}
+                  {edu.description && <p className="text-sm">{edu.description}</p>}
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-gray-400 italic">No education history added yet</p>
+          )}
+        </div>
+      );
+    }
+    
+    if (section === 'skills') {
+      return (
+        <div className="mb-6">
+          <h3 className="text-lg font-semibold mb-3">Skills</h3>
+          <div className="mb-3">
+            <div className="flex">
+              <input
+                type="text"
+                className="flex-1 border border-gray-300 rounded-l-lg p-3 focus:outline-none focus:ring-2 focus:ring-[#4ECCA3] focus:border-transparent"
+                placeholder="Add a skill (e.g., Project Management, JavaScript)"
+                value={newSkill}
+                onChange={(e) => setNewSkill(e.target.value)}
+                onKeyPress={(e) => e.key === 'Enter' && addSkill()}
+              />
+              <button
+                onClick={addSkill}
+                className="bg-[#4ECCA3] text-white px-4 py-2 rounded-r-lg hover:bg-[#45B08C] transition-colors"
+              >
+                Add Skill
+              </button>
+            </div>
+            <p className="text-xs text-gray-500 mt-1">
+              Pro tip: Include 5-10 relevant skills that match the job description
+            </p>
+          </div>
+          
+          {resumeData.skills.length > 0 ? (
+            <div className="flex flex-wrap gap-2">
+              {resumeData.skills.map((skill, idx) => (
+                <div key={idx} className="group bg-gray-100 text-gray-800 px-3 py-1 rounded text-sm flex items-center">
+                  {skill}
+                  <button
+                    onClick={() => removeSkill(idx)}
+                    className="ml-2 text-gray-400 hover:text-red-500 transition-colors"
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-gray-400 italic">No skills added yet</p>
+          )}
+        </div>
+      );
+    }
+    
+    if (section === 'links') {
+      return (
+        <div className="mb-6">
+          <h3 className="text-lg font-semibold mb-3">Links</h3>
+          {resumeData.links.length > 0 ? (
+            <div className="space-y-2">
+              {resumeData.links.map((link, idx) => (
+                <div key={idx} className="flex items-center text-sm">
+                  <LinkIcon className="h-4 w-4 mr-2 text-gray-400" />
+                  <span className="font-medium">{link.title || "Link"}: </span>
+                  <a href={link.url} className="text-blue-500 hover:underline ml-1 truncate">{link.url}</a>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-gray-400 italic">No links added yet</p>
+          )}
+        </div>
+      );
+    }
+
+    // For custom sections and predefined sections without special rendering
+    if (resumeData.customSections && 
+        (Object.keys(resumeData.customSections).includes(section) || 
+         ['courses', 'activities', 'hobbies', 'languages', 'references'].includes(section))) {
+      
+      // Get items - check in customSections first, then in the default sections if needed
+      const items = resumeData.customSections[section] || [];
+      const displayName = section.replace(/_/g, ' ');
+      
+      return (
+        <div className="mb-6">
+          <h3 className="text-lg font-semibold mb-3 capitalize">{displayName}</h3>
+          {items.length > 0 ? (
+            <ul className="list-disc pl-5 space-y-1">
+              {items.map((item, idx) => (
+                <li key={idx}>{item}</li>
+              ))}
+            </ul>
+          ) : (
+            <p className="text-gray-400 italic">No {displayName} added yet</p>
+          )}
+        </div>
+      );
+    }
+    
+    // If the section doesn't match any known type
+    return null;
+  };
+
+  // Calculate resume score based on completeness
+  useEffect(() => {
+    let score = 5; // Base score
+    
+    // Add points for each completed section
+    if (resumeData.name) score += 5;
+    if (resumeData.title) score += 5;
+    if (resumeData.email) score += 5;
+    if (resumeData.phone) score += 5;
+    if (resumeData.location) score += 5;
+    if (resumeData.summary && resumeData.summary.length > 100) score += 10;
+    if (resumeData.employment.length > 0) score += 15;
+    if (resumeData.education.length > 0) score += 15;
+    if (resumeData.skills.length > 3) score += 10;
+    if (resumeData.links.length > 0) score += 5;
+    if (Object.keys(resumeData.customSections).length > 0) score += 10;
+    
+    // Cap at 100
+    score = Math.min(score, 100);
+    setResumeScore(score);
+  }, [resumeData]);
+
+  const handleTemplateChange = (templateId: string) => {
+    setActiveTemplate(templateId);
+    setShowTemplateModal(false);
+  };
+
+  const exportToPDF = async () => {
+    const resumeElement = resumeRef.current;
+    if (!resumeElement) return;
+    
+    // Show loading state
+    setIsGeneratingPDF(true);
+    
+    try {
+      // Create a deep clone of the resume element to avoid modifying the original
+      const clonedElement = resumeElement.cloneNode(true) as HTMLElement;
+      
+      // Remove watermark if present
+      const watermark = clonedElement.querySelector('.absolute.bottom-2.right-4');
+      if (watermark) {
+        watermark.remove();
+      }
+      
+      // Preserve flex and icon styling for better PDF generation
+      const preserveClassProperties = (element: HTMLElement) => {
+        // Get all elements with flex classes
+        const flexElements = element.querySelectorAll('.flex, .flex-row, .flex-col, .inline-flex');
+        flexElements.forEach(el => {
+          (el as HTMLElement).style.display = 'flex';
+          
+          if (el.classList.contains('flex-col')) {
+            (el as HTMLElement).style.flexDirection = 'column';
+          }
+          
+          if (el.classList.contains('items-center')) {
+            (el as HTMLElement).style.alignItems = 'center';
+          }
+          
+          if (el.classList.contains('justify-center')) {
+            (el as HTMLElement).style.justifyContent = 'center';
+          }
+          
+          if (el.classList.contains('justify-between')) {
+            (el as HTMLElement).style.justifyContent = 'space-between';
+          }
+          
+          // Handle gap classes
+          if (el.classList.contains('gap-1')) {
+            (el as HTMLElement).style.gap = '0.25rem';
+          } else if (el.classList.contains('gap-2')) {
+            (el as HTMLElement).style.gap = '0.5rem';
+          } else if (el.classList.contains('gap-3')) {
+            (el as HTMLElement).style.gap = '0.75rem';
+          } else if (el.classList.contains('gap-4')) {
+            (el as HTMLElement).style.gap = '1rem';
+          }
+        });
+        
+        // Process icons and SVGs
+        const iconElements = element.querySelectorAll('svg, .icon, .w-4, .h-4, .w-5, .h-5');
+        iconElements.forEach(el => {
+          (el as HTMLElement).style.display = 'inline-block';
+          (el as HTMLElement).style.verticalAlign = 'middle';
+          
+          if (el.classList.contains('w-4') || el.classList.contains('h-4')) {
+            (el as HTMLElement).style.width = '1rem';
+            (el as HTMLElement).style.height = '1rem';
+          }
+          
+          if (el.classList.contains('w-5') || el.classList.contains('h-5')) {
+            (el as HTMLElement).style.width = '1.25rem';
+            (el as HTMLElement).style.height = '1.25rem';
+          }
+        });
+        
+        // Process margin classes
+        const marginElements = element.querySelectorAll('[class*="mr-"], [class*="ml-"], [class*="mt-"], [class*="mb-"]');
+        marginElements.forEach(el => {
+          if (el.classList.contains('mr-1')) {
+            (el as HTMLElement).style.marginRight = '0.25rem';
+          } else if (el.classList.contains('mr-2')) {
+            (el as HTMLElement).style.marginRight = '0.5rem';
+          } else if (el.classList.contains('ml-1')) {
+            (el as HTMLElement).style.marginLeft = '0.25rem';
+          } else if (el.classList.contains('ml-2')) {
+            (el as HTMLElement).style.marginLeft = '0.5rem';
+          }
+        });
+      };
+      
+      // Apply the style preservation to the cloned element
+      preserveClassProperties(clonedElement);
+      
+      try {
+        // Try to use the Puppeteer server first
+        const response = await fetch('http://localhost:3001/api/generate-pdf', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            htmlContent: clonedElement.innerHTML,
+            fileName: `${resumeData.name || 'my'}_resume`,
+            cssStyles: `
+              /* Base resume styles */
+              .resume-${activeTemplate} {
+                height: 100%;
+                width: 100%;
+              }
+              
+              /* Spacing */
+              .p-4 { padding: 1rem; }
+              .p-5 { padding: 1.25rem; }
+              .p-6 { padding: 1.5rem; }
+              .p-8 { padding: 2rem; }
+              .pt-1 { padding-top: 0.25rem; }
+              .pt-2 { padding-top: 0.5rem; }
+              .pt-4 { padding-top: 1rem; }
+              .pb-1 { padding-bottom: 0.25rem; }
+              .pb-2 { padding-bottom: 0.5rem; }
+              .pb-4 { padding-bottom: 1rem; }
+              .pl-1 { padding-left: 0.25rem; }
+              .pl-2 { padding-left: 0.5rem; }
+              .pl-4 { padding-left: 1rem; }
+              .pr-1 { padding-right: 0.25rem; }
+              .pr-2 { padding-right: 0.5rem; }
+              .pr-4 { padding-right: 1rem; }
+              
+              .m-1 { margin: 0.25rem; }
+              .m-2 { margin: 0.5rem; }
+              .m-4 { margin: 1rem; }
+              .mt-1 { margin-top: 0.25rem; }
+              .mt-2 { margin-top: 0.5rem; }
+              .mt-4 { margin-top: 1rem; }
+              .mb-1 { margin-bottom: 0.25rem; }
+              .mb-2 { margin-bottom: 0.5rem; }
+              .mb-4 { margin-bottom: 1rem; }
+              .mb-6 { margin-bottom: 1.5rem; }
+              .ml-1 { margin-left: 0.25rem; }
+              .ml-2 { margin-left: 0.5rem; }
+              .ml-4 { margin-left: 1rem; }
+              .mr-1 { margin-right: 0.25rem; }
+              .mr-2 { margin-right: 0.5rem; }
+              .mr-4 { margin-right: 1rem; }
+              
+              /* Typography */
+              h1 { font-size: 1.5rem; font-weight: 700; }
+              h2 { font-size: 1.25rem; color: #4B5563; font-weight: 600; }
+              h3 { font-size: 1rem; font-weight: 600; }
+              p { margin-bottom: 0.5rem; }
+              .text-xs { font-size: 0.75rem; }
+              .text-sm { font-size: 0.875rem; }
+              .text-base { font-size: 1rem; }
+              .text-lg { font-size: 1.125rem; }
+              .text-xl { font-size: 1.25rem; }
+              .text-2xl { font-size: 1.5rem; }
+              .font-bold { font-weight: 700; }
+              .font-semibold { font-weight: 600; }
+              .font-medium { font-weight: 500; }
+              .font-normal { font-weight: 400; }
+              .text-gray-600 { color: #4B5563; }
+              .text-gray-700 { color: #374151; }
+              .text-gray-800 { color: #1F2937; }
+              
+              /* Layout */
+              .flex { display: flex; }
+              .flex-row { display: flex; flex-direction: row; }
+              .flex-col { display: flex; flex-direction: column; }
+              .justify-between { justify-content: space-between; }
+              .justify-center { justify-content: center; }
+              .items-center { align-items: center; }
+              .items-start { align-items: flex-start; }
+              .gap-1 { gap: 0.25rem; }
+              .gap-2 { gap: 0.5rem; }
+              .gap-4 { gap: 1rem; }
+              
+              /* Borders */
+              .border-b { border-bottom-width: 1px; border-bottom-style: solid; border-bottom-color: #E5E7EB; }
+              .border-t { border-top-width: 1px; border-top-style: solid; border-top-color: #E5E7EB; }
+              .border-l { border-left-width: 1px; border-left-style: solid; border-left-color: #E5E7EB; }
+              .border-r { border-right-width: 1px; border-right-style: solid; border-right-color: #E5E7EB; }
+              
+              /* Icons */
+              svg, .icon, .w-4, .h-4, .w-5, .h-5 {
+                display: inline-block;
+                vertical-align: middle;
+              }
+              .w-4, .h-4 {
+                width: 1rem;
+                height: 1rem;
+              }
+              .w-5, .h-5 {
+                width: 1.25rem;
+                height: 1.25rem;
+              }
+              
+              /* Overriding styles for print */
+              * {
+                print-color-adjust: exact !important;
+                -webkit-print-color-adjust: exact !important;
+              }
+            `
+          }),
+        });
+        
+        if (!response.ok) {
+          throw new Error('Server response not OK');
+        }
+        
+        // Get the PDF blob and create a download link
+        const pdfBlob = await response.blob();
+        const downloadUrl = URL.createObjectURL(pdfBlob);
+        const downloadLink = document.createElement('a');
+        downloadLink.href = downloadUrl;
+        downloadLink.download = `${resumeData.name ? resumeData.name.replace(/\s+/g, '_') : 'my'}_resume.pdf`;
+        
+        // Trigger the download
+        document.body.appendChild(downloadLink);
+        downloadLink.click();
+        document.body.removeChild(downloadLink);
+        
+        // Clean up
+        URL.revokeObjectURL(downloadUrl);
+        console.log('PDF generated using Puppeteer server');
+        
+      } catch (serverError) {
+        console.warn('Puppeteer server unavailable, falling back to html2canvas', serverError);
+        
+        // Fall back to html2canvas if the server is not available
+        const canvas = await html2canvas(resumeElement, {
+          scale: 2,
+          useCORS: true,
+          logging: false,
+          backgroundColor: '#ffffff'
+        });
+        
+        // Calculate the PDF dimensions (A4 size)
+        const imgWidth = 210; // mm (A4 width)
+        const imgHeight = (canvas.height * imgWidth) / canvas.width;
+        
+        // Create a new PDF
+        const pdf = new jsPDF({
+          orientation: 'portrait',
+          unit: 'mm',
+          format: 'a4'
+        });
+        
+        // Add the image to the PDF
+        const imgData = canvas.toDataURL('image/png');
+        pdf.addImage(imgData, 'PNG', 0, 0, imgWidth, imgHeight);
+        
+        // Save the PDF with a meaningful name
+        const fileName = `${resumeData.name ? resumeData.name.replace(/\s+/g, '_') : 'my'}_resume.pdf`;
+        pdf.save(fileName);
+        
+        console.log('PDF generated using html2canvas fallback');
+      }
+      
+    } catch (error) {
+      console.error('Error generating PDF:', error);
+      alert('Failed to generate PDF. Please try again.');
+    } finally {
+      // Reset loading state
+      setIsGeneratingPDF(false);
+    }
+  };
+
+  return (
+    <div className="flex h-screen bg-white">
+      {/* Left Panel: Editor */}
+      <div className="w-1/2 overflow-y-auto p-6 border-r border-gray-200">
+        <div className="flex justify-between items-center mb-6">
+          <h1 className="text-xl font-bold text-gray-900">Resume Creator</h1>
+          <div className="flex space-x-2">
+            <button 
+              onClick={navigateBack}
+              className="px-3 py-1 bg-gray-600 text-white text-sm rounded-md hover:bg-gray-700 transition-colors mr-2"
+            >
+              Dashboard
+            </button>
+            <button 
+              onClick={saveProgress}
+              className="px-3 py-1 bg-blue-600 text-white text-sm rounded-md hover:bg-blue-700 transition-colors mr-2"
+            >
+              Save Progress
+            </button>
+            <span className="px-3 py-1 bg-gray-100 text-gray-700 text-sm rounded-full">English</span>
+          </div>
+        </div>
+
+        {/* Resume Progress */}
+        <div className="mb-6 bg-red-50 rounded-lg p-4 flex items-center justify-between">
+          <div className="flex items-center">
+            <div className="text-red-500 text-sm font-medium bg-white border border-red-200 rounded-full px-2 py-0.5 mr-2">{resumeScore}%</div>
+            <span className="text-sm text-gray-700">Resume Progress</span>
+          </div>
+          <button className="text-sm text-blue-600 hover:text-blue-700 flex items-center">
+            Try it <span className="ml-1">→</span>
+          </button>
+        </div>
+
+        {/* Form Content */}
+        <div className="space-y-8">
+          {/* Personal Details Section */}
+          <div>
+            <h2 className="text-lg font-medium text-gray-900 mb-4">Personal details</h2>
+            <div className="space-y-4">
+              {/* Photo Upload */}
+              <div className="flex items-center space-x-4">
+                <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center overflow-hidden">
+                  {profilePhoto ? (
+                    <img src={profilePhoto} alt="Profile" className="w-full h-full object-cover" />
+                  ) : (
+                    <div className="text-gray-400">
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                      </svg>
+                    </div>
+                  )}
+                </div>
+                <button 
+                  onClick={handlePhotoUpload} 
+                  className="text-blue-600 hover:text-blue-700 text-sm font-medium"
+                >
+                  Upload photo
+                </button>
+                <input 
+                  type="file" 
+                  ref={fileInputRef} 
+                  accept="image/*" 
+                  className="hidden" 
+                  onChange={handleFileChange} 
+                />
+              </div>
+              
+              {/* Job Title */}
+              <div>
+                <label htmlFor="jobTitle" className="block text-sm font-medium text-gray-700 mb-1">Job Title</label>
+                <input
+                  type="text"
+                  id="jobTitle"
+                  placeholder="The role you want"
+                  className="w-full p-2 border border-gray-300 rounded-md"
+                  value={resumeData.title}
+                  onChange={(e) => handleInputChange('title', e.target.value)}
+                />
+              </div>
+              
+              {/* Name Fields */}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label htmlFor="firstName" className="block text-sm font-medium text-gray-700 mb-1">First Name</label>
+                  <input
+                    type="text"
+                    id="firstName"
+                    className="w-full p-2 border border-gray-300 rounded-md"
+                    value={resumeData.name.split(' ')[0] || ''}
+                    onChange={(e) => {
+                      const lastName = resumeData.name.split(' ').slice(1).join(' ');
+                      handleInputChange('name', `${e.target.value} ${lastName}`.trim());
+                    }}
+                  />
+                </div>
+                <div>
+                  <label htmlFor="lastName" className="block text-sm font-medium text-gray-700 mb-1">Last Name</label>
+                  <input
+                    type="text"
+                    id="lastName"
+                    className="w-full p-2 border border-gray-300 rounded-md"
+                    value={resumeData.name.split(' ').slice(1).join(' ') || ''}
+                    onChange={(e) => {
+                      const firstName = resumeData.name.split(' ')[0] || '';
+                      handleInputChange('name', `${firstName} ${e.target.value}`.trim());
+                    }}
+                  />
+                </div>
+              </div>
+              
+              {/* Contact Fields */}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+                  <input
+                    type="email"
+                    id="email"
+                    className="w-full p-2 border border-gray-300 rounded-md"
+                    value={resumeData.email}
+                    onChange={(e) => handleInputChange('email', e.target.value)}
+                  />
+                </div>
+                <div>
+                  <label htmlFor="phone" className="block text-sm font-medium text-gray-700 mb-1">Phone</label>
+                  <input
+                    type="tel"
+                    id="phone"
+                    className="w-full p-2 border border-gray-300 rounded-md"
+                    value={resumeData.phone}
+                    onChange={(e) => handleInputChange('phone', e.target.value)}
+                  />
+                </div>
+              </div>
+              
+              {/* Location Fields */}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label htmlFor="country" className="block text-sm font-medium text-gray-700 mb-1">Country</label>
+                  <input
+                    type="text"
+                    id="country"
+                    className="w-full p-2 border border-gray-300 rounded-md"
+                    value={resumeData.location.split(',')[1]?.trim() || ''}
+                    onChange={(e) => {
+                      const city = resumeData.location.split(',')[0]?.trim() || '';
+                      handleInputChange('location', city ? `${city}, ${e.target.value}` : e.target.value);
+                    }}
+                  />
+                </div>
+                <div>
+                  <label htmlFor="city" className="block text-sm font-medium text-gray-700 mb-1">City</label>
+                  <input
+                    type="text"
+                    id="city"
+                    className="w-full p-2 border border-gray-300 rounded-md"
+                    value={resumeData.location.split(',')[0]?.trim() || ''}
+                    onChange={(e) => {
+                      const country = resumeData.location.split(',')[1]?.trim() || '';
+                      handleInputChange('location', country ? `${e.target.value}, ${country}` : e.target.value);
+                    }}
+                  />
+                </div>
+              </div>
+              
+              {/* Add More Details */}
+              <div>
+                <button className="text-blue-600 hover:text-blue-700 text-sm font-medium flex items-center">
+                  Add more detail <span className="ml-1">↓</span>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* Professional Summary Section */}
+          <div>
+            <h2 className="text-lg font-medium text-gray-900 mb-4">Professional Summary</h2>
+            <div className="mb-6">
+              <div className="flex justify-between items-center mb-2">
+                <p className="text-sm text-gray-600 mb-2">Tell employers about your career history in a few sentences</p>
+                <button 
+                  onClick={() => setShowAIWritingHelp(true)}
+                  className="px-3 py-1 bg-blue-600 text-white text-xs rounded-full flex items-center hover:bg-blue-700 transition-colors"
+                >
+                  <PenLine className="h-3 w-3 mr-1" />
+                  AI-Assist
+                </button>
+              </div>
+              <textarea
+                className="w-full border border-gray-300 rounded-lg p-3 focus:outline-none focus:ring-2 focus:ring-[#4ECCA3] focus:border-transparent"
+                placeholder="Write 2-4 short, energetic sentences that grab an employer's attention and highlight your skills and work ethic..."
+                rows={5}
+                value={resumeData.summary}
+                onChange={(e) => handleInputChange('summary', e.target.value)}
+              />
+              <div className="flex justify-between text-xs text-gray-500 mt-1">
+                <p>400-600 characters recommended</p>
+                <p>{resumeData.summary.length} characters</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Employment History Section */}
+          <div>
+            <h2 className="text-lg font-medium text-gray-900 mb-4">Employment History</h2>
+            <div className="space-y-6">
+              {resumeData.employment.map((job, index) => (
+                <div key={index} className="border border-gray-200 rounded-lg p-4 relative">
+                  <button 
+                    onClick={() => removeEmployment(index)}
+                    className="absolute top-3 right-3 text-gray-400 hover:text-red-500"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </button>
+                  
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Job Title</label>
+                      <input
+                        type="text"
+                        className="w-full p-2 border border-gray-300 rounded-md"
+                        placeholder="e.g. Product Manager"
+                        value={job.position}
+                        onChange={(e) => handleInputChange(`employment.${index}.position`, e.target.value)}
+                      />
+                    </div>
+                    
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Company Name</label>
+                      <input
+                        type="text"
+                        className="w-full p-2 border border-gray-300 rounded-md"
+                        placeholder="e.g. Apple Inc."
+                        value={job.company}
+                        onChange={(e) => handleInputChange(`employment.${index}.company`, e.target.value)}
+                      />
+                    </div>
+                    
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Start Date</label>
+                        <input
+                          type="text"
+                          className="w-full p-2 border border-gray-300 rounded-md"
+                          placeholder="e.g. Jan 2020"
+                          value={job.startDate}
+                          onChange={(e) => handleInputChange(`employment.${index}.startDate`, e.target.value)}
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">End Date</label>
+                        <input
+                          type="text"
+                          className="w-full p-2 border border-gray-300 rounded-md"
+                          placeholder="e.g. Present"
+                          value={job.endDate}
+                          onChange={(e) => handleInputChange(`employment.${index}.endDate`, e.target.value)}
+                        />
+                      </div>
+                    </div>
+                    
+                    <div>
+                      <div className="flex justify-between items-center mb-1">
+                        <label className="block text-sm font-medium text-gray-700">Job Description</label>
+                        <button 
+                          className="text-xs text-blue-600 hover:text-blue-700"
+                          onClick={() => {
+                            setShowAIWritingHelp(true);
+                          }}
+                        >
+                          Get help writing
+                        </button>
+                      </div>
+                      <textarea
+                        rows={4}
+                        className="w-full p-2 border border-gray-300 rounded-md"
+                        placeholder="Describe your responsibilities and achievements in this role... Each new line will be displayed as a bullet point"
+                        value={job.description}
+                        onChange={(e) => handleInputChange(`employment.${index}.description`, e.target.value)}
+                      />
+                      <div className="text-xs text-gray-500 mt-1">
+                        Press Enter for new bullet points
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+              
+              <button
+                onClick={addEmployment}
+                className="w-full py-2 border border-dashed border-gray-300 rounded-lg text-gray-500 hover:text-gray-700 hover:border-gray-400 flex items-center justify-center"
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                Add Employment
+              </button>
+            </div>
+          </div>
+          
+          {/* Education Section */}
+          <div>
+            <h2 className="text-lg font-medium text-gray-900 mb-4">Education</h2>
+            <div className="space-y-6">
+              {resumeData.education.map((edu, index) => (
+                <div key={index} className="border border-gray-200 rounded-lg p-4 relative">
+                  <button 
+                    onClick={() => removeEducation(index)}
+                    className="absolute top-3 right-3 text-gray-400 hover:text-red-500"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </button>
+                  
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Degree & Field of Study</label>
+                      <input
+                        type="text"
+                        className="w-full p-2 border border-gray-300 rounded-md"
+                        placeholder="e.g. Bachelor of Science in Computer Science"
+                        value={edu.degree}
+                        onChange={(e) => handleInputChange(`education.${index}.degree`, e.target.value)}
+                      />
+                    </div>
+                    
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Institution Name</label>
+                      <input
+                        type="text"
+                        className="w-full p-2 border border-gray-300 rounded-md"
+                        placeholder="e.g. Massachusetts Institute of Technology"
+                        value={edu.institution}
+                        onChange={(e) => handleInputChange(`education.${index}.institution`, e.target.value)}
+                      />
+                    </div>
+                    
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Start Date</label>
+                        <input
+                          type="text"
+                          className="w-full p-2 border border-gray-300 rounded-md"
+                          placeholder="e.g. Sep 2018"
+                          value={edu.startDate}
+                          onChange={(e) => handleInputChange(`education.${index}.startDate`, e.target.value)}
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">End Date</label>
+                        <input
+                          type="text"
+                          className="w-full p-2 border border-gray-300 rounded-md"
+                          placeholder="e.g. Jun 2022"
+                          value={edu.endDate}
+                          onChange={(e) => handleInputChange(`education.${index}.endDate`, e.target.value)}
+                        />
+                      </div>
+                    </div>
+                    
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Location</label>
+                      <input
+                        type="text"
+                        className="w-full p-2 border border-gray-300 rounded-md"
+                        placeholder="e.g. Cambridge, MA"
+                        value={edu.location}
+                        onChange={(e) => handleInputChange(`education.${index}.location`, e.target.value)}
+                      />
+                    </div>
+                    
+                    <div>
+                      <div className="flex items-center mb-1">
+                        <label className="block text-sm font-medium text-gray-700">GPA (optional)</label>
+                      </div>
+                      <input
+                        type="text"
+                        className="w-full p-2 border border-gray-300 rounded-md"
+                        placeholder="e.g. 3.8/4.0"
+                        value={edu.gpa}
+                        onChange={(e) => handleInputChange(`education.${index}.gpa`, e.target.value)}
+                      />
+                    </div>
+                    
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Description / Achievements</label>
+                      <textarea
+                        rows={3}
+                        className="w-full p-2 border border-gray-300 rounded-md"
+                        placeholder="Relevant coursework, honors, achievements..."
+                        value={edu.description}
+                        onChange={(e) => handleInputChange(`education.${index}.description`, e.target.value)}
+                      />
+                    </div>
+                  </div>
+                </div>
+              ))}
+              
+              <button
+                onClick={addEducation}
+                className="w-full py-2 border border-dashed border-gray-300 rounded-lg text-gray-500 hover:text-gray-700 hover:border-gray-400 flex items-center justify-center"
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                Add Education
+              </button>
+            </div>
+          </div>
+          
+          {/* Skills Section */}
+          <div>
+            <h2 className="text-lg font-medium text-gray-900 mb-4">Skills</h2>
+            <div className="space-y-4">
+              <div>
+                <p className="text-sm text-gray-600 mb-2">Add relevant skills that showcase your abilities</p>
+                <div className="flex flex-wrap gap-2 mb-3">
+                  {resumeData.skills.map((skill, index) => (
+                    <div 
+                      key={index} 
+                      className="inline-flex items-center px-3 py-1 rounded-full text-sm bg-gray-100 hover:bg-gray-200"
+                    >
+                      <span>{skill}</span>
+                      <button
+                        onClick={() => removeSkill(index)}
+                        className="ml-2 text-gray-500 hover:text-red-500"
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+                
+                <div className="flex">
+                  <input
+                    type="text"
+                    className="flex-1 p-2 border border-gray-300 rounded-l-md focus:outline-none focus:ring-2 focus:ring-[#4ECCA3] focus:border-transparent"
+                    placeholder="e.g. JavaScript, Project Management, etc."
+                    value={newSkill}
+                    onChange={(e) => setNewSkill(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && e.target.value.trim()) {
+                        addSkill();
+                        e.preventDefault();
+                      }
+                    }}
+                  />
+                  <button
+                    onClick={addSkill}
+                    disabled={!newSkill.trim()}
+                    className="px-3 py-2 bg-[#4ECCA3] text-white rounded-r-md hover:bg-[#3dbb92]"
+                  >
+                    Add
+                  </button>
+                </div>
+              </div>
+              
+              <div>
+                <h3 className="text-sm font-medium text-gray-700 mb-2">Popular skills in your industry</h3>
+                <div className="flex flex-wrap gap-2">
+                  {[
+                    'Communication', 'Leadership', 'Problem Solving', 'Teamwork', 
+                    'Critical Thinking', 'Time Management', 'Creativity', 'Adaptability'
+                  ].map((skill, index) => (
+                    <button
+                      key={index}
+                      onClick={() => {
+                        if (!resumeData.skills.includes(skill)) {
+                          handleInputChange('skills', [...resumeData.skills, skill]);
+                        }
+                      }}
+                      className="px-3 py-1 text-sm border border-gray-300 rounded-full hover:bg-gray-100"
+                      disabled={resumeData.skills.includes(skill)}
+                    >
+                      {skill}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          {/* Additional Sections Section */}
+          <div>
+            <h2 className="text-lg font-medium text-gray-900 mb-4">Additional Sections</h2>
+            <div className="space-y-4">
+              <p className="text-sm text-gray-600">Add more sections to make your resume stand out</p>
+              <div className="grid grid-cols-2 gap-4">
+                <button
+                  onClick={() => {
+                    if (!activeSections.includes('languages')) {
+                      setActiveSections([...activeSections, 'languages']);
+                      
+                      // Initialize with one empty entry
+                      setResumeData({
+                        ...resumeData,
+                        customSections: {
+                          ...resumeData.customSections,
+                          languages: ['']
+                        }
+                      });
+                    }
+                  }}
+                  className={`p-3 text-center border rounded-lg ${activeSections.includes('languages') ? 'border-blue-500 bg-blue-50' : 'border-gray-300 hover:bg-gray-50'}`}
+                >
+                  <LanguagesIcon className="h-5 w-5 mx-auto mb-1 text-gray-600" />
+                  <span className="text-sm">Languages</span>
+                </button>
+                
+                <button
+                  onClick={() => {
+                    if (!activeSections.includes('certifications')) {
+                      setActiveSections([...activeSections, 'certifications']);
+                      
+                      // Initialize with one empty entry
+                      setResumeData({
+                        ...resumeData,
+                        customSections: {
+                          ...resumeData.customSections,
+                          certifications: ['']
+                        }
+                      });
+                    }
+                  }}
+                  className={`p-3 text-center border rounded-lg ${activeSections.includes('certifications') ? 'border-blue-500 bg-blue-50' : 'border-gray-300 hover:bg-gray-50'}`}
+                >
+                  <Award className="h-5 w-5 mx-auto mb-1 text-gray-600" />
+                  <span className="text-sm">Certifications</span>
+                </button>
+                
+                <button
+                  onClick={() => {
+                    if (!activeSections.includes('projects')) {
+                      setActiveSections([...activeSections, 'projects']);
+                      
+                      // Initialize with one empty entry
+                      setResumeData({
+                        ...resumeData,
+                        customSections: {
+                          ...resumeData.customSections,
+                          projects: ['']
+                        }
+                      });
+                    }
+                  }}
+                  className={`p-3 text-center border rounded-lg ${activeSections.includes('projects') ? 'border-blue-500 bg-blue-50' : 'border-gray-300 hover:bg-gray-50'}`}
+                >
+                  <FolderIcon className="h-5 w-5 mx-auto mb-1 text-gray-600" />
+                  <span className="text-sm">Projects</span>
+                </button>
+                
+                <button
+                  onClick={() => {
+                    if (!activeSections.includes('interests')) {
+                      setActiveSections([...activeSections, 'interests']);
+                      
+                      // Initialize with one empty entry
+                      setResumeData({
+                        ...resumeData,
+                        customSections: {
+                          ...resumeData.customSections,
+                          interests: ['']
+                        }
+                      });
+                    }
+                  }}
+                  className={`p-3 text-center border rounded-lg ${activeSections.includes('interests') ? 'border-blue-500 bg-blue-50' : 'border-gray-300 hover:bg-gray-50'}`}
+                >
+                  <Heart className="h-5 w-5 mx-auto mb-1 text-gray-600" />
+                  <span className="text-sm">Interests</span>
+                </button>
+                
+                {/* Custom Section Button */}
+                <button
+                  onClick={() => setShowCustomSectionInput(true)}
+                  className="p-3 text-center border border-dashed border-gray-300 rounded-lg hover:bg-gray-50"
+                >
+                  <Plus className="h-5 w-5 mx-auto mb-1 text-gray-600" />
+                  <span className="text-sm">Custom Section</span>
+                </button>
+              </div>
+            </div>
+            
+            {/* Custom Section Name Input */}
+            {showCustomSectionInput && (
+              <div className="mt-4 p-4 border border-gray-200 rounded-md bg-gray-50">
+                <h3 className="text-sm font-medium text-gray-800 mb-2">Create Custom Section</h3>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={newCustomSectionName}
+                    onChange={(e) => setNewCustomSectionName(e.target.value)}
+                    placeholder="Section Name (e.g., Publications)"
+                    className="flex-1 p-2 border border-gray-300 rounded-md"
+                  />
+                  <button
+                    onClick={() => {
+                      if (newCustomSectionName.trim()) {
+                        const sectionKey = newCustomSectionName.toLowerCase().replace(/\s+/g, '_');
+                        
+                        if (!activeSections.includes(sectionKey)) {
+                          setActiveSections([...activeSections, sectionKey]);
+                          
+                          // Initialize with one empty entry
+                          setResumeData({
+                            ...resumeData,
+                            customSections: {
+                              ...resumeData.customSections,
+                              [sectionKey]: ['']
+                            }
+                          });
+                          
+                          // Reset
+                          setNewCustomSectionName('');
+                          setShowCustomSectionInput(false);
+                        }
+                      }
+                    }}
+                    className="px-3 py-2 bg-blue-600 text-white text-sm rounded-md hover:bg-blue-700"
+                    disabled={!newCustomSectionName.trim()}
+                  >
+                    Add
+                  </button>
+                  <button
+                    onClick={() => {
+                      setNewCustomSectionName('');
+                      setShowCustomSectionInput(false);
+                    }}
+                    className="px-3 py-2 border border-gray-300 text-gray-700 text-sm rounded-md hover:bg-gray-100"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            )}
+            
+            {/* Language section input fields */}
+            {activeSections.includes('languages') && (
+              <div className="mt-6">
+                <h3 className="text-md font-medium text-gray-800 mb-3">Languages</h3>
+                <div className="space-y-3">
+                  {resumeData.customSections.languages?.map((language, index) => (
+                    <div key={index} className="flex gap-2">
+                      <input
+                        type="text"
+                        value={language}
+                        onChange={(e) => {
+                          const updatedLanguages = [...(resumeData.customSections.languages || [])];
+                          updatedLanguages[index] = e.target.value;
+                          setResumeData({
+                            ...resumeData,
+                            customSections: {
+                              ...resumeData.customSections,
+                              languages: updatedLanguages
+                            }
+                          });
+                        }}
+                        placeholder="Language (e.g., English - Native)"
+                        className="flex-1 p-2 border border-gray-300 rounded-md"
+                      />
+                      <button
+                        onClick={() => {
+                          const updatedLanguages = [...(resumeData.customSections.languages || [])];
+                          updatedLanguages.splice(index, 1);
+                          setResumeData({
+                            ...resumeData,
+                            customSections: {
+                              ...resumeData.customSections,
+                              languages: updatedLanguages
+                            }
+                          });
+                        }}
+                        className="p-2 text-red-500 hover:text-red-700"
+                      >
+                        <Trash2 className="h-5 w-5" />
+                      </button>
+                    </div>
+                  ))}
+                  <button
+                    onClick={() => {
+                      setResumeData({
+                        ...resumeData,
+                        customSections: {
+                          ...resumeData.customSections,
+                          languages: [...(resumeData.customSections.languages || []), '']
+                        }
+                      });
+                    }}
+                    className="text-sm text-blue-600 hover:text-blue-800 flex items-center"
+                  >
+                    <Plus className="h-4 w-4 mr-1" /> Add Language
+                  </button>
+                </div>
+              </div>
+            )}
+            
+            {/* Certifications section input fields */}
+            {activeSections.includes('certifications') && (
+              <div className="mt-6">
+                <h3 className="text-md font-medium text-gray-800 mb-3">Certifications</h3>
+                <div className="space-y-3">
+                  {resumeData.customSections.certifications?.map((certification, index) => (
+                    <div key={index} className="flex gap-2">
+                      <input
+                        type="text"
+                        value={certification}
+                        onChange={(e) => {
+                          const updatedCertifications = [...(resumeData.customSections.certifications || [])];
+                          updatedCertifications[index] = e.target.value;
+                          setResumeData({
+                            ...resumeData,
+                            customSections: {
+                              ...resumeData.customSections,
+                              certifications: updatedCertifications
+                            }
+                          });
+                        }}
+                        placeholder="Certification (e.g., AWS Certified Solutions Architect)"
+                        className="flex-1 p-2 border border-gray-300 rounded-md"
+                      />
+                      <button
+                        onClick={() => {
+                          const updatedCertifications = [...(resumeData.customSections.certifications || [])];
+                          updatedCertifications.splice(index, 1);
+                          setResumeData({
+                            ...resumeData,
+                            customSections: {
+                              ...resumeData.customSections,
+                              certifications: updatedCertifications
+                            }
+                          });
+                        }}
+                        className="p-2 text-red-500 hover:text-red-700"
+                      >
+                        <Trash2 className="h-5 w-5" />
+                      </button>
+                    </div>
+                  ))}
+                  <button
+                    onClick={() => {
+                      setResumeData({
+                        ...resumeData,
+                        customSections: {
+                          ...resumeData.customSections,
+                          certifications: [...(resumeData.customSections.certifications || []), '']
+                        }
+                      });
+                    }}
+                    className="text-sm text-blue-600 hover:text-blue-800 flex items-center"
+                  >
+                    <Plus className="h-4 w-4 mr-1" /> Add Certification
+                  </button>
+                </div>
+              </div>
+            )}
+            
+            {/* Projects section input fields */}
+            {activeSections.includes('projects') && (
+              <div className="mt-6">
+                <h3 className="text-md font-medium text-gray-800 mb-3">Projects</h3>
+                <div className="space-y-3">
+                  {resumeData.customSections.projects?.map((project, index) => (
+                    <div key={index} className="flex gap-2">
+                      <input
+                        type="text"
+                        value={project}
+                        onChange={(e) => {
+                          const updatedProjects = [...(resumeData.customSections.projects || [])];
+                          updatedProjects[index] = e.target.value;
+                          setResumeData({
+                            ...resumeData,
+                            customSections: {
+                              ...resumeData.customSections,
+                              projects: updatedProjects
+                            }
+                          });
+                        }}
+                        placeholder="Project (e.g., Personal Portfolio Website)"
+                        className="flex-1 p-2 border border-gray-300 rounded-md"
+                      />
+                      <button
+                        onClick={() => {
+                          const updatedProjects = [...(resumeData.customSections.projects || [])];
+                          updatedProjects.splice(index, 1);
+                          setResumeData({
+                            ...resumeData,
+                            customSections: {
+                              ...resumeData.customSections,
+                              projects: updatedProjects
+                            }
+                          });
+                        }}
+                        className="p-2 text-red-500 hover:text-red-700"
+                      >
+                        <Trash2 className="h-5 w-5" />
+                      </button>
+                    </div>
+                  ))}
+                  <button
+                    onClick={() => {
+                      setResumeData({
+                        ...resumeData,
+                        customSections: {
+                          ...resumeData.customSections,
+                          projects: [...(resumeData.customSections.projects || []), '']
+                        }
+                      });
+                    }}
+                    className="text-sm text-blue-600 hover:text-blue-800 flex items-center"
+                  >
+                    <Plus className="h-4 w-4 mr-1" /> Add Project
+                  </button>
+                </div>
+              </div>
+            )}
+            
+            {/* Interests section input fields */}
+            {activeSections.includes('interests') && (
+              <div className="mt-6">
+                <h3 className="text-md font-medium text-gray-800 mb-3">Interests</h3>
+                <div className="space-y-3">
+                  {resumeData.customSections.interests?.map((interest, index) => (
+                    <div key={index} className="flex gap-2">
+                      <input
+                        type="text"
+                        value={interest}
+                        onChange={(e) => {
+                          const updatedInterests = [...(resumeData.customSections.interests || [])];
+                          updatedInterests[index] = e.target.value;
+                          setResumeData({
+                            ...resumeData,
+                            customSections: {
+                              ...resumeData.customSections,
+                              interests: updatedInterests
+                            }
+                          });
+                        }}
+                        placeholder="Interest (e.g., Photography, Hiking)"
+                        className="flex-1 p-2 border border-gray-300 rounded-md"
+                      />
+                      <button
+                        onClick={() => {
+                          const updatedInterests = [...(resumeData.customSections.interests || [])];
+                          updatedInterests.splice(index, 1);
+                          setResumeData({
+                            ...resumeData,
+                            customSections: {
+                              ...resumeData.customSections,
+                              interests: updatedInterests
+                            }
+                          });
+                        }}
+                        className="p-2 text-red-500 hover:text-red-700"
+                      >
+                        <Trash2 className="h-5 w-5" />
+                      </button>
+                    </div>
+                  ))}
+                  <button
+                    onClick={() => {
+                      setResumeData({
+                        ...resumeData,
+                        customSections: {
+                          ...resumeData.customSections,
+                          interests: [...(resumeData.customSections.interests || []), '']
+                        }
+                      });
+                    }}
+                    className="text-sm text-blue-600 hover:text-blue-800 flex items-center"
+                  >
+                    <Plus className="h-4 w-4 mr-1" /> Add Interest
+                  </button>
+                </div>
+              </div>
+            )}
+            
+            {/* Dynamic Custom Sections */}
+            {activeSections
+              .filter(section => 
+                !['languages', 'certifications', 'projects', 'interests', 'personal', 'summary', 'employment', 'education', 'skills', 'links'].includes(section)
+              )
+              .map(sectionKey => {
+                // Convert snake_case to Title Case for display
+                const sectionTitle = sectionKey
+                  .split('_')
+                  .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+                  .join(' ');
+                
+                return (
+                  <div key={sectionKey} className="mt-6">
+                    <div className="flex justify-between items-center mb-3">
+                      <h3 className="text-md font-medium text-gray-800">{sectionTitle}</h3>
+                      <button 
+                        onClick={() => {
+                          // Remove from active sections
+                          setActiveSections(activeSections.filter(s => s !== sectionKey));
+                          
+                          // Remove from customSections (optional, can keep the data for later)
+                          const updatedCustomSections = { ...resumeData.customSections };
+                          delete updatedCustomSections[sectionKey];
+                          
+                          setResumeData({
+                            ...resumeData,
+                            customSections: updatedCustomSections
+                          });
+                        }}
+                        className="text-sm text-red-500 hover:text-red-700"
+                      >
+                        Remove Section
+                      </button>
+                    </div>
+                    <div className="space-y-3">
+                      {resumeData.customSections[sectionKey]?.map((item, index) => (
+                        <div key={index} className="flex gap-2">
+                          <input
+                            type="text"
+                            value={item}
+                            onChange={(e) => {
+                              const updatedItems = [...(resumeData.customSections[sectionKey] || [])];
+                              updatedItems[index] = e.target.value;
+                              setResumeData({
+                                ...resumeData,
+                                customSections: {
+                                  ...resumeData.customSections,
+                                  [sectionKey]: updatedItems
+                                }
+                              });
+                            }}
+                            placeholder={`Add ${sectionTitle} item`}
+                            className="flex-1 p-2 border border-gray-300 rounded-md"
+                          />
+                          <button
+                            onClick={() => {
+                              const updatedItems = [...(resumeData.customSections[sectionKey] || [])];
+                              updatedItems.splice(index, 1);
+                              setResumeData({
+                                ...resumeData,
+                                customSections: {
+                                  ...resumeData.customSections,
+                                  [sectionKey]: updatedItems
+                                }
+                              });
+                            }}
+                            className="p-2 text-red-500 hover:text-red-700"
+                          >
+                            <Trash2 className="h-5 w-5" />
+                          </button>
+                        </div>
+                      ))}
+                      <button
+                        onClick={() => {
+                          setResumeData({
+                            ...resumeData,
+                            customSections: {
+                              ...resumeData.customSections,
+                              [sectionKey]: [...(resumeData.customSections[sectionKey] || []), '']
+                            }
+                          });
+                        }}
+                        className="text-sm text-blue-600 hover:text-blue-800 flex items-center"
+                      >
+                        <Plus className="h-4 w-4 mr-1" /> Add Item
+                      </button>
+                    </div>
+                  </div>
+                );
+              })
+            }
+          </div>
+          
+          {/* Export and Options Section */}
+          <div className="mt-8 border-t pt-6">
+            <h2 className="text-lg font-medium text-gray-900 mb-4">Export Options</h2>
+            <div className="space-y-4">
+              <div className="flex gap-4">
+                <button
+                  onClick={exportToPDF}
+                  className="flex-1 py-3 bg-[#4ECCA3] text-white rounded-lg flex items-center justify-center hover:bg-[#3dbb92]"
+                >
+                  <FileDown className="h-5 w-5 mr-2" />
+                  Download PDF
+                </button>
+                
+                <button
+                  onClick={() => setShowTemplateModal(true)}
+                  className="flex-1 py-3 border border-gray-300 rounded-lg flex items-center justify-center hover:bg-gray-50"
+                >
+                  <Layout className="h-5 w-5 mr-2" />
+                  Change Template
+                </button>
+              </div>
+              
+              <div className="p-4 bg-blue-50 text-blue-800 rounded-lg">
+                <div className="flex items-start">
+                  <Info className="h-5 w-5 mr-2 mt-0.5 flex-shrink-0" />
+                  <div>
+                    <p className="text-sm font-medium">Resume Progress: {resumeScore}%</p>
+                    <div className="w-full h-2 bg-blue-200 rounded-full my-2">
+                      <div 
+                        className="h-full bg-blue-600 rounded-full" 
+                        style={{ width: `${resumeScore}%` }}
+                      ></div>
+                    </div>
+                    <p className="text-xs">
+                      {resumeScore < 40 ? 'Your resume needs more information to stand out.' : 
+                       resumeScore < 70 ? 'Your resume is getting better! Add more details to improve your score.' : 
+                       'Great job! Your resume is looking professional.'}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Right Panel: Preview */}
+      <div className="w-1/2 bg-gray-50 overflow-y-auto flex flex-col">
+        <div className="flex-1 flex flex-col">
+          <div className="p-6 flex justify-end space-x-2">
+            <button 
+              onClick={() => setShowTemplateModal(true)}
+              className="px-3 py-1.5 border border-gray-300 rounded-md text-sm text-gray-700 flex items-center"
+            >
+              Select template
+            </button>
+            <button 
+              onClick={exportToPDF}
+              className="px-3 py-1.5 bg-blue-600 text-white rounded-md text-sm flex items-center"
+            >
+              Download PDF
+            </button>
+          </div>
+          
+          <div className="flex-1 flex items-center justify-center p-6">
+            <div className="relative w-full max-w-[595px] h-[842px] shadow-lg bg-white mx-auto overflow-hidden" ref={resumeRef} id="resume-preview">
+              {/* Resume Preview Content */}
+              <div className={`resume-${activeTemplate} h-full`}>
+                <div className="p-8 h-full overflow-y-auto">
+                  {/* Header */}
+                  <div className="mb-6 relative">
+                    <h1 className="text-2xl font-bold">{resumeData.name || 'Your Name'}</h1>
+                    <h2 className="text-lg text-gray-600">{resumeData.title || 'Professional Title'}</h2>
+                    <div className="flex flex-wrap mt-2 gap-3 text-sm text-gray-600">
+                      {resumeData.email && (
+                        <div className="flex items-center">
+                          <Mail className="h-4 w-4 mr-1" />
+                          {resumeData.email}
+                        </div>
+                      )}
+                      {resumeData.phone && (
+                        <div className="flex items-center">
+                          <Phone className="h-4 w-4 mr-1" />
+                          {resumeData.phone}
+                        </div>
+                      )}
+                      {resumeData.location && (
+                        <div className="flex items-center">
+                          <MapPin className="h-4 w-4 mr-1" />
+                          {resumeData.location}
+                        </div>
+                      )}
+                    </div>
+                    
+                    {profilePhoto && (
+                      <div className="absolute top-0 right-0 w-24 h-24 rounded-full overflow-hidden border-2 border-gray-200">
+                        <img src={profilePhoto} alt="Profile" className="w-full h-full object-cover" />
+                      </div>
+                    )}
+                  </div>
+                  
+                  {/* Dynamically render all active sections */}
+                  {activeSections.map((section) => {
+                    if (section === 'personal') {
+                      return null; // Personal section is already shown in the header
+                    }
+                    
+                    return (
+                      <div key={section} className="mb-6">
+                        {section === 'summary' && resumeData.summary && (
+                          <>
+                            <h3 className={`text-base font-semibold mb-2 ${activeTemplate === 'modern' ? 'bg-gray-800 text-white p-1 pl-3' : 'border-b pb-1'}`}>
+                              Professional Summary
+                            </h3>
+                            <p className="text-sm text-gray-700">{resumeData.summary}</p>
+                          </>
+                        )}
+                        
+                        {section === 'employment' && resumeData.employment.length > 0 && (
+                          <>
+                            <h3 className={`text-base font-semibold mb-2 ${activeTemplate === 'modern' ? 'bg-gray-800 text-white p-1 pl-3' : 'border-b pb-1'}`}>
+                              Work Experience
+                            </h3>
+                            <div className="space-y-4">
+                              {resumeData.employment.map((job, idx) => (
+                                <div key={idx} className="text-sm">
+                                  <div className="flex justify-between font-medium">
+                                    <span>{job.position}</span>
+                                    <span className="text-gray-600">{job.startDate} - {job.endDate || 'Present'}</span>
+                                  </div>
+                                  <div className="text-gray-600 mb-1">{job.company}</div>
+                                  <ul className="list-disc pl-5 space-y-1">
+                                    {job.description.split('\n').map((line, index) => (
+                                      line.trim() ? <li key={index} className="text-gray-700">{line}</li> : null
+                                    ))}
+                                  </ul>
+                                </div>
+                              ))}
+                            </div>
+                          </>
+                        )}
+                        
+                        {section === 'education' && resumeData.education.length > 0 && (
+                          <>
+                            <h3 className={`text-base font-semibold mb-2 ${activeTemplate === 'modern' ? 'bg-gray-800 text-white p-1 pl-3' : 'border-b pb-1'}`}>
+                              Education
+                            </h3>
+                            <div className="space-y-4">
+                              {resumeData.education.map((edu, idx) => (
+                                <div key={idx} className="text-sm">
+                                  <div className="flex justify-between font-medium">
+                                    <span>{edu.degree}</span>
+                                    <span className="text-gray-600">{edu.startDate} - {edu.endDate || 'Present'}</span>
+                                  </div>
+                                  <div className="text-gray-600">{edu.institution}</div>
+                                  {edu.location && <div className="text-gray-600 mb-1">{edu.location}</div>}
+                                  {edu.gpa && <div className="text-gray-600 mb-1">GPA: {edu.gpa}</div>}
+                                  {edu.description && <div className="text-gray-700 mt-1">{edu.description}</div>}
+                                </div>
+                              ))}
+                            </div>
+                          </>
+                        )}
+                        
+                        {section === 'skills' && resumeData.skills.length > 0 && (
+                          <>
+                            <h3 className={`text-base font-semibold mb-2 ${activeTemplate === 'modern' ? 'bg-gray-800 text-white p-1 pl-3' : 'border-b pb-1'}`}>
+                              Skills
+                            </h3>
+                            {activeTemplate === 'modern' ? (
+                              <div className="flex flex-wrap gap-2">
+                                {resumeData.skills.map((skill, idx) => (
+                                  <span key={idx} className="bg-gray-100 text-gray-800 px-2 py-1 rounded-sm text-xs">{skill}</span>
+                                ))}
+                              </div>
+                            ) : (
+                              <div className="columns-2 text-sm text-gray-700">
+                                {resumeData.skills.map((skill, idx) => (
+                                  <div key={idx} className="mb-1">• {skill}</div>
+                                ))}
+                              </div>
+                            )}
+                          </>
+                        )}
+                        
+                        {section === 'links' && resumeData.links.length > 0 && (
+                          <>
+                            <h3 className={`text-base font-semibold mb-2 ${activeTemplate === 'modern' ? 'bg-gray-800 text-white p-1 pl-3' : 'border-b pb-1'}`}>
+                              Links
+                            </h3>
+                            <div className="space-y-1 text-sm">
+                              {resumeData.links.map((link, idx) => (
+                                <div key={idx} className="flex items-center">
+                                  <LinkIcon className="h-3 w-3 mr-2 text-gray-500" />
+                                  <span className="font-medium">{link.title || "Link"}: </span>
+                                  <a href={link.url} className="text-blue-500 hover:underline ml-1 truncate">{link.url}</a>
+                                </div>
+                              ))}
+                            </div>
+                          </>
+                        )}
+                        
+                        {/* Custom sections */}
+                        {Object.keys(resumeData.customSections).includes(section) && resumeData.customSections[section].length > 0 && (
+                          <>
+                            <h3 className={`text-base font-semibold mb-2 ${activeTemplate === 'modern' ? 'bg-gray-800 text-white p-1 pl-3' : 'border-b pb-1'}`}>
+                              {section.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                            </h3>
+                            <ul className="list-disc list-inside text-sm text-gray-700 space-y-1">
+                              {resumeData.customSections[section].map((item, idx) => (
+                                <li key={idx}>{item}</li>
+                              ))}
+                            </ul>
+                          </>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+              
+              {/* Watermark for templates */}
+              <div className="absolute bottom-2 right-4 text-gray-300 text-xs">
+                Template: {activeTemplate.charAt(0).toUpperCase() + activeTemplate.slice(1)}
+              </div>
+            </div>
+          </div>
+          
+          <div className="border-t border-gray-200 p-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-2">
+                <button 
+                  className="p-1.5 bg-white border border-gray-300 rounded-md text-sm text-gray-700 flex items-center"
+                  onClick={() => printResume()}
+                >
+                  <Printer className="h-4 w-4 mr-1" />
+                  Print
+                </button>
+                <button 
+                  className="p-1.5 bg-white border border-gray-300 rounded-md text-sm text-gray-700 flex items-center"
+                  onClick={() => shareResume()}
+                >
+                  <Share className="h-4 w-4 mr-1" />
+                  Share
+                </button>
+              </div>
+              
+              <div className="text-sm text-gray-500 flex items-center justify-center">
+                <button className="mx-2 hover:text-gray-700">←</button>
+                <span>1 / 1</span>
+                <button className="mx-2 hover:text-gray-700">→</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Template Selector Modal */}
+      <div className={`fixed inset-0 bg-gray-800 bg-opacity-75 flex items-center justify-center z-50 transition-opacity ${showTemplateModal ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
+        <div className="bg-white rounded-lg w-full max-w-4xl max-h-[90vh] overflow-y-auto">
+          <div className="p-6 border-b">
+            <div className="flex justify-between items-center">
+              <h2 className="text-xl font-semibold text-gray-900">Choose a Template</h2>
+              <button
+                onClick={() => setShowTemplateModal(false)}
+                className="text-gray-400 hover:text-gray-500"
+              >
+                <X className="h-6 w-6" />
+              </button>
+            </div>
+          </div>
+          
+          <div className="p-6">
+            <p className="text-gray-600 mb-6">Select a template that best showcases your professional experience and career goals.</p>
+            
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              {[
+                { id: 'modern', name: 'Modern', description: 'Clean, contemporary design with sleek layout' },
+                { id: 'classic', name: 'Classic', description: 'Traditional resume format, perfect for all industries' },
+                { id: 'creative', name: 'Creative', description: 'Bold design for creative fields' },
+                { id: 'minimal', name: 'Minimal', description: 'Simple, straightforward layout that focuses on content' },
+                { id: 'professional', name: 'Professional', description: 'Refined design for corporate and executive roles' },
+                { id: 'elegant', name: 'Elegant', description: 'Sophisticated design with tasteful typography' }
+              ].map((template) => (
+                <div 
+                  key={template.id}
+                  onClick={() => setActiveTemplate(template.id)}
+                  className={`border rounded-lg overflow-hidden cursor-pointer transition-all hover:shadow-md ${activeTemplate === template.id ? 'ring-2 ring-[#4ECCA3] shadow-md' : ''}`}
+                >
+                  <div className="h-48 bg-gray-100 flex items-center justify-center">
+                    {/* Template preview - Replace with actual previews */}
+                    <div className={`w-full h-full flex items-center justify-center ${template.id === 'modern' ? 'bg-gradient-to-br from-blue-50 to-blue-100' : 
+                                       template.id === 'classic' ? 'bg-gradient-to-br from-gray-50 to-gray-200' :
+                                       template.id === 'creative' ? 'bg-gradient-to-br from-purple-50 to-blue-100' :
+                                       template.id === 'minimal' ? 'bg-gradient-to-br from-white to-gray-100' :
+                                       template.id === 'professional' ? 'bg-gradient-to-br from-slate-50 to-slate-200' :
+                                       'bg-gradient-to-br from-amber-50 to-amber-100'}`}>
+                      <img
+                        src={`/assets/template-${template.id}.png`}
+                        alt={`${template.name} template preview`}
+                        className="w-full h-full object-contain p-2"
+                        onError={(e) => {
+                          // Fallback if image doesn't load
+                          const target = e.target as HTMLImageElement;
+                          target.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgZmlsbD0iI2YxZjFmMSIvPjx0ZXh0IHg9IjUwJSIgeT0iNTAlIiBmb250LWZhbWlseT0iQXJpYWwsIHNhbnMtc2VyaWYiIGZvbnQtc2l6ZT0iMjAiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGFsaWdubWVudC1iYXNlbGluZT0ibWlkZGxlIiBmaWxsPSIjODg4Ij5UZW1wbGF0ZSBQcmV2aWV3PC90ZXh0Pjwvc3ZnPg==';
+                        }}
+                      />
+                    </div>
+                  </div>
+                  <div className="p-4">
+                    <h3 className="font-medium text-gray-900">{template.name}</h3>
+                    <p className="text-sm text-gray-500 mt-1">{template.description}</p>
+                  </div>
+                  {activeTemplate === template.id && (
+                    <div className="py-2 px-4 bg-[#4ECCA3] text-white flex items-center justify-center">
+                      <CheckCircle className="h-4 w-4 mr-1" /> Selected
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+          
+          <div className="p-4 border-t flex justify-end space-x-4">
+            <button
+              onClick={() => setShowTemplateModal(false)}
+              className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={() => handleTemplateChange(activeTemplate)}
+              className="px-4 py-2 bg-[#4ECCA3] text-white rounded-md hover:bg-[#3dbb92]"
+            >
+              Apply Template
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* AI Writing Help Modal */}
+      <AIWritingAssistant
+        show={showAIWritingHelp}
+        onClose={() => setShowAIWritingHelp(false)}
+        onApplySuggestion={(text) => {
+          setResumeData({
+            ...resumeData,
+            summary: text
+          });
+          setShowAIWritingHelp(false);
+        }}
+        currentText={resumeData.summary}
+        section="summary"
+        jobTitle={resumeData.title}
+      />
+    </div>
+  );
+};
+
+export default ResumeCreator;

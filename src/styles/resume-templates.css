@@ -1,0 +1,197 @@
+/* Resume Template Styling Variables */
+:root {
+  /* Default values */
+  --resume-font: 'Open Sans', sans-serif;
+  --resume-accent: #3b82f6;
+  --primary-color: #3b82f6;
+  --resume-text-color: #1f2937;
+  --resume-background: #ffffff;
+  --resume-header-text: #ffffff;
+  --resume-header-bg: var(--resume-accent);
+  --resume-sidebar-bg: #f3f4f6;
+  --resume-highlight: #f3f4f6;
+  --resume-font-serif: 'Georgia', serif;
+  
+  /* Typography and spacing */
+  --resume-font-scale: 1;
+  --resume-line-spacing: 1.5;
+  --resume-section-spacing: 1.25rem;
+}
+
+/* Modern templates */
+.template-modern {
+  --resume-header-bg: var(--resume-accent);
+  --resume-header-text: #ffffff;
+}
+
+.template-modernGradient {
+  --resume-header-bg: linear-gradient(90deg, var(--resume-accent) 0%, color-mix(in srgb, var(--resume-accent) 70%, #ffffff) 100%);
+  --resume-header-text: #ffffff;
+}
+
+.template-modernProfile {
+  --resume-header-bg: var(--resume-accent);
+  --resume-header-text: #ffffff;
+}
+
+/* Professional templates */
+.template-professional {
+  --resume-header-bg: #ffffff;
+  --resume-header-text: var(--resume-text-color);
+  --resume-accent-border: var(--resume-accent);
+}
+
+.template-professionalDark {
+  --resume-background: #1e293b;
+  --resume-text-color: #f8fafc;
+  --resume-header-text: #f8fafc;
+  --resume-header-bg: #0f172a;
+  --resume-accent-border: var(--resume-accent);
+}
+
+/* Minimalist templates */
+.template-minimalist {
+  --resume-header-bg: #ffffff;
+  --resume-header-text: var(--resume-text-color);
+  --resume-section-title-transform: uppercase;
+  --resume-section-title-weight: 500;
+  --resume-section-title-spacing: 0.05em;
+}
+
+.template-minimalistClean {
+  --resume-header-bg: #ffffff;
+  --resume-header-text: var(--resume-text-color);
+  --resume-section-title-transform: uppercase;
+  --resume-section-title-weight: 500;
+  --resume-section-title-spacing: 0.05em;
+}
+
+/* Creative templates */
+.template-creativeSidebar {
+  --resume-sidebar-bg: var(--resume-accent);
+  --resume-sidebar-text: #ffffff;
+}
+
+.template-creativeViolet {
+  --resume-header-bg: linear-gradient(90deg, #8b5cf6 0%, #a78bfa 100%);
+  --resume-header-text: #ffffff;
+}
+
+.template-creativeOrange {
+  --resume-header-bg: linear-gradient(90deg, #f97316 0%, #fb923c 100%);
+  --resume-header-text: #ffffff;
+}
+
+/* Elegant templates */
+.template-elegantSerif {
+  --resume-font: var(--resume-font-serif);
+  --resume-section-title-style: italic;
+  --resume-section-title-color: var(--resume-accent);
+}
+
+.template-elegantMinimal {
+  --resume-font: var(--resume-font-serif);
+  --resume-section-title-style: normal;
+  --resume-section-title-color: var(--resume-accent);
+  --resume-section-title-weight: 600;
+}
+
+/* Startup template */
+.template-startup {
+  --resume-header-bg: #ffffff;
+  --resume-header-text: var(--resume-text-color);
+  --resume-section-title-bg: var(--resume-accent);
+  --resume-section-title-text: #ffffff;
+  --resume-section-title-padding: 0.25rem 0.5rem;
+  --resume-section-title-radius: 0.25rem;
+}
+
+/* Section title styling */
+.section-title-borderBottom {
+  border-bottom: 2px solid var(--resume-accent);
+  padding-bottom: 0.25rem;
+}
+
+.section-title-coloredText {
+  color: var(--resume-accent);
+}
+
+.section-title-uppercase {
+  text-transform: uppercase;
+  letter-spacing: var(--resume-section-title-spacing, 0.05em);
+  font-weight: var(--resume-section-title-weight, 500);
+}
+
+.section-title-serif {
+  font-family: var(--resume-font-serif);
+  font-style: var(--resume-section-title-style, italic);
+  color: var(--resume-section-title-color, var(--resume-accent));
+}
+
+.section-title-tag {
+  background-color: var(--resume-section-title-bg, var(--resume-accent));
+  color: var(--resume-section-title-text, #ffffff);
+  padding: var(--resume-section-title-padding, 0.25rem 0.5rem);
+  border-radius: var(--resume-section-title-radius, 0.25rem);
+  display: inline-block;
+}
+
+/* Font scaling */
+.resume-content {
+  font-size: calc(1rem * var(--resume-font-scale));
+  line-height: var(--resume-line-spacing);
+}
+
+.resume-content h1 {
+  font-size: calc(1.5rem * var(--resume-font-scale));
+}
+
+.resume-content h2 {
+  font-size: calc(1.25rem * var(--resume-font-scale));
+}
+
+.resume-content h3 {
+  font-size: calc(1.125rem * var(--resume-font-scale));
+}
+
+.resume-content p, .resume-content li {
+  font-size: calc(1rem * var(--resume-font-scale));
+}
+
+.resume-content .small-text {
+  font-size: calc(0.875rem * var(--resume-font-scale));
+}
+
+/* Section spacing */
+.resume-section {
+  margin-bottom: var(--resume-section-spacing);
+}
+
+/* Template-specific layouts */
+.layout-sidebar {
+  display: grid;
+  grid-template-columns: 30% 70%;
+  gap: 1rem;
+}
+
+.layout-sidebar .sidebar {
+  background-color: var(--resume-sidebar-bg);
+  color: var(--resume-sidebar-text, var(--resume-text-color));
+  padding: 1.5rem;
+}
+
+.layout-sidebar .main-content {
+  padding: 1.5rem;
+}
+
+.layout-fullWidth .header {
+  background-color: var(--resume-header-bg);
+  color: var(--resume-header-text);
+  padding: 1.5rem;
+}
+
+.layout-gradient .header {
+  background: var(--resume-header-bg);
+  color: var(--resume-header-text);
+  padding: 1.5rem;
+}

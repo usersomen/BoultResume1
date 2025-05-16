@@ -1,0 +1,143 @@
+/* 
+Resume Creator Theme CSS
+Add these styles to your application to update the Resume Creator's left panel
+*/
+
+/* Left panel background */
+.resume-creator-left-panel {
+  background-color: #1a202c; /* dark gray-900 */
+  color: white;
+  border-right-color: #4a5568; /* gray-700 */
+}
+
+/* Header styling */
+.resume-creator-header {
+  color: white;
+  font-weight: bold;
+  font-size: 1.5rem;
+}
+
+/* Button styling */
+.resume-creator-button-primary {
+  background-color: #4ECCA3; /* Main brand color */
+  color: white;
+  border-radius: 0.5rem;
+  padding: 0.5rem 1rem;
+  transition: background-color 0.3s;
+}
+
+.resume-creator-button-primary:hover {
+  background-color: #45B08C; /* Darker shade for hover */
+}
+
+.resume-creator-button-secondary {
+  background-color: #2d3748; /* gray-800 */
+  color: white;
+  border: 1px solid #4a5568; /* gray-700 */
+  border-radius: 0.5rem;
+  padding: 0.5rem 1rem;
+  transition: background-color 0.3s;
+}
+
+.resume-creator-button-secondary:hover {
+  background-color: #4a5568; /* gray-700 */
+}
+
+/* Progress section */
+.resume-creator-progress-section {
+  background-color: #2d3748; /* gray-800 */
+  border: 1px solid #4a5568; /* gray-700 */
+  border-radius: 0.5rem;
+}
+
+.resume-creator-progress-indicator {
+  background-color: #4ECCA3;
+  color: white;
+  border-radius: 9999px;
+  padding: 0.25rem 0.75rem;
+}
+
+.resume-creator-link {
+  color: #4ECCA3;
+}
+
+.resume-creator-link:hover {
+  color: #45B08C;
+}
+
+/* Input fields */
+.resume-creator-input {
+  background-color: #2d3748; /* gray-800 */
+  border: 1px solid #4a5568; /* gray-700 */
+  color: white;
+  border-radius: 0.375rem;
+  padding: 0.5rem;
+}
+
+.resume-creator-input:focus {
+  border-color: #4ECCA3;
+  box-shadow: 0 0 0 3px rgba(78, 204, 163, 0.2);
+  outline: none;
+}
+
+/* Form labels */
+.resume-creator-label {
+  color: #e2e8f0; /* gray-300 */
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+/* Section headers */
+.resume-creator-section-header {
+  background-color: #2d3748; /* gray-800 */
+  border: 1px solid #4a5568; /* gray-700 */
+  border-radius: 0.375rem;
+  color: white;
+  padding: 0.75rem;
+}
+
+.resume-creator-section-header:hover {
+  background-color: #323a4b; /* A bit lighter than gray-800 */
+}
+
+/* Toggle switches */
+.resume-creator-toggle {
+  background-color: #4a5568; /* gray-700 */
+}
+
+.resume-creator-toggle:checked {
+  background-color: #4ECCA3;
+}
+
+.resume-creator-toggle-slider {
+  background-color: white;
+}
+
+/* Dividers */
+.resume-creator-divider {
+  border-color: #4a5568; /* gray-700 */
+}
+
+/* Action buttons (add, remove) */
+.resume-creator-action-button {
+  color: #4ECCA3;
+  border: 1px dashed #4a5568; /* gray-700 */
+  border-radius: 0.375rem;
+  padding: 0.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+}
+
+.resume-creator-action-button:hover {
+  background-color: #2d3748; /* gray-800 */
+}
+
+.resume-creator-remove-button {
+  color: #e2e8f0; /* gray-300 */
+}
+
+.resume-creator-remove-button:hover {
+  color: #fc8181; /* red-400 */
+}

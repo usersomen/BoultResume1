@@ -1,0 +1,46 @@
+1. Add import at the top of the file:
+import ImageCropper from '../common/ImageCropper';
+
+2. Add these state variables after other useState declarations:
+const [cropperVisible, setCropperVisible] = useState(false);
+const [tempImageSrc, setTempImageSrc] = useState<string | null>(null);
+
+3. Replace the handleFileChange function with this:
+// Function to handle file input change
+const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const file = event.target.files?.[0];
+  if (file) {
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      // Instead of setting the profile photo directly, set the temp image and show cropper
+      setTempImageSrc(reader.result as string);
+      setCropperVisible(true);
+    };
+    reader.readAsDataURL(file);
+  }
+};
+
+4. Add these new functions:
+// Function to handle crop completion
+const handleCropComplete = (croppedImageUrl: string) => {
+  setProfilePhoto(croppedImageUrl);
+  setCropperVisible(false);
+  setTempImageSrc(null);
+};
+
+// Function to cancel cropping
+const handleCropCancel = () => {
+  setCropperVisible(false);
+  setTempImageSrc(null);
+};
+
+5. Add this JSX right before the closing return statement (before the final </div>):
+{/* Image Cropper Modal */}
+{cropperVisible && tempImageSrc && (
+  <ImageCropper
+    imageSrc={tempImageSrc}
+    onCropComplete={handleCropComplete}
+    onCancel={handleCropCancel}
+    aspectRatio={1}
+  />
+)}

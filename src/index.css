@@ -1,0 +1,31 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Import resume template styles */
+@import './styles/resume-templates.css';
+@import './styles/resume-typography.css';
+
+@layer base {
+  html {
+    scroll-behavior: smooth;
+    scroll-padding-top: 5rem; /* Adjust based on navbar height */
+  }
+  
+  body {
+    @apply bg-background text-gray-900;
+  }
+}
+
+@layer utilities {
+  .perspective-1000 {
+    perspective: 1000px;
+  }
+}
+
+/* Smooth transitions */
+.smooth-transition {
+  transition-property: all;
+  transition-duration: 300ms;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+}

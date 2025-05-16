@@ -1,0 +1,103 @@
+/* 
+ * Resume Typography and Spacing System
+ * This file contains CSS variables and utility classes for consistent typography
+ * and spacing throughout the resume builder application.
+ */
+
+:root {
+  /* Typography Scale Variables */
+  --resume-font-scale-small: 0.9;
+  --resume-font-scale-medium: 1.0;
+  --resume-font-scale-large: 1.1;
+  
+  /* Content Density (Line Spacing) Variables */
+  --resume-line-spacing-compact: 1.2;
+  --resume-line-spacing-medium: 1.5;
+  --resume-line-spacing-spacious: 1.8;
+  
+  /* Section Spacing Variables */
+  --resume-section-spacing-small: 0.75rem;
+  --resume-section-spacing-medium: 1.25rem;
+  --resume-section-spacing-large: 2rem;
+  
+  /* Default values - will be overridden by user preferences */
+  --resume-font-scale: var(--resume-font-scale-medium);
+  --resume-line-spacing: var(--resume-line-spacing-medium);
+  --resume-section-spacing: var(--resume-section-spacing-medium);
+}
+
+/* Typography Scale Classes */
+.resume-content {
+  /* Base font size scaled by the font scale variable */
+  font-size: calc(1rem * var(--resume-font-scale));
+  line-height: var(--resume-line-spacing);
+}
+
+.resume-content h1 {
+  font-size: calc(1.5rem * var(--resume-font-scale));
+  margin-bottom: calc(0.5rem * var(--resume-font-scale));
+}
+
+.resume-content h2 {
+  font-size: calc(1.25rem * var(--resume-font-scale));
+  margin-bottom: calc(0.5rem * var(--resume-font-scale));
+}
+
+.resume-content h3 {
+  font-size: calc(1.125rem * var(--resume-font-scale));
+  margin-bottom: calc(0.5rem * var(--resume-font-scale));
+}
+
+.resume-content p {
+  margin-bottom: calc(0.5rem * var(--resume-font-scale));
+}
+
+/* Section Spacing Classes */
+.resume-section {
+  margin-bottom: var(--resume-section-spacing);
+}
+
+.resume-section-header {
+  margin-bottom: calc(var(--resume-section-spacing) * 0.5);
+}
+
+/* Section Type Styling */
+.resume-section-essential .resume-section-header {
+  font-weight: 600;
+  color: var(--resume-text-color, #1f2937);
+}
+
+.resume-section-additional .resume-section-header {
+  font-weight: 500;
+  color: var(--resume-text-color, #1f2937);
+}
+
+.resume-section-custom .resume-section-header {
+  font-weight: 500;
+  color: var(--resume-accent, #3b82f6);
+}
+
+/* Template-specific section styling */
+.resume-modern .resume-section-custom {
+  border-left: 3px solid var(--resume-accent, #3b82f6);
+  padding-left: 0.75rem;
+}
+
+.resume-creative .resume-section-custom {
+  background-color: rgba(var(--resume-accent-rgb, 59, 130, 246), 0.05);
+  padding: 0.75rem;
+  border-radius: 0.375rem;
+}
+
+/* Utility classes for content density */
+.resume-content-compact {
+  --resume-line-spacing: var(--resume-line-spacing-compact);
+}
+
+.resume-content-medium {
+  --resume-line-spacing: var(--resume-line-spacing-medium);
+}
+
+.resume-content-spacious {
+  --resume-line-spacing: var(--resume-line-spacing-spacious);
+}
